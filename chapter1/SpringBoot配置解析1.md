@@ -1,8 +1,8 @@
 ## 前言
 
-众所周知，Spring Boot 的一大特性就是"约定优于配置"，Spring Boot 之所以这么受欢迎，简化配置这一项功不可没，所以，当你了解了 Spring Boot 的配置原理后，你就了解了 Spring Boot 的整个理念。
+众所周知，Spring Boot 的一大特性就是"约定优于配置"，Spring Boot 之所以这么受欢迎，简化配置这一项功不可没，所以，当你了解了 Spring Boot 的配置原理后，你就了解了Spring Boot。
 
-这是 Spring Boot 配置系列第一篇，主要讲一下 Spring Boot加载配置的流程和原理。
+这是 Spring Boot 配置系列第一篇，主要从顶层讲一下Spring Boot 配置相关的类以及加载顺序 。
 
 ### 相关类
 
@@ -27,9 +27,9 @@ public abstract class PropertySource<T> {
 
 #### Environment
 
-`Environment`可以看做 Spring 对整个环境属性的抽象，它继承了`PropertyResolver` ，所以能通过它获取程序的配置，同时它又增加了 `String[] getActiveProfiles()` 等方法，用来获取程序当前激活的 `profile`。
+`Environment` 可以看做 Spring 对整个环境属性的抽象，它继承了`PropertyResolver` ，所以能通过它获取程序的配置，同时它又增加了 `String[] getActiveProfiles()` 等方法，用来获取程序当前激活的 `profile`，所以它等于 `property` + `profile` 。
 
-把 `Environment` 注入即可获取程序配置。
+在程序中，只要把 `Environment` 注入即可获取程序配置。
 
 ```java
 @Service
@@ -46,7 +46,7 @@ public class TestService extends implements ITestService {
 
 ### 属性加载流程
 
-在 Spring Boot 启动调用的 `run()` 方法中
+####1. prepareEnvironment() 准备环境
 
 ```java
 	// 准备 Environment 环境
@@ -59,7 +59,7 @@ public class TestService extends implements ITestService {
 	...
 ```
 
-在 run 方法中可以发现，程序会先准备 Environment 环境，然后才创建容器。
+在 Spring Boot 启动时调用的 `run()` 方法中，程序会先准备 Environment 环境，然后才创建容器。
 
 ```java
 	private ConfigurableEnvironment prepareEnvironment(
@@ -76,7 +76,13 @@ public class TestService extends implements ITestService {
 	}
 ```
 
-在 `prepareEnvironment()`  方法中，首先会创建 `ConfigurableEnvironment` ，在这里需要注意的是，程序会判断当前 `environment` 类型，如果是标准的 `StandardEnvironment` 会加载系统环境属性和 JVM 环境属性，如果是 `StandardWebEnvironment` 还会额外加载 `servlet` 相关的属性。 
+在 `prepareEnvironment()`  方法中，首先会创建 `ConfigurableEnvironment` ，在这里需要注意的是，程序会判断当前 `environment` 类型，如果是标准的 `StandardEnvironment`， 会加载系统环境属性和 JVM 环境属性，如果是 `StandardWebEnvironment` 还会额外加载 `servlet` 相关的属性。
+
+他们之间的关系如下图所示：
+
+【这儿放一张图】
+
+ 
 
 `StandardWebEnvironment` 判断方法如下：
 
@@ -90,12 +96,14 @@ public class TestService extends implements ITestService {
 		return true;
 	}
 
-其中：
 String[] WEB_ENVIRONMENT_CLASSES = { "javax.servlet.Servlet",
 			"org.springframework.web.context.ConfigurableWebApplicationContext" };
+//所以，只要程序中有包含这两个类，Spring Boot就会认为这是一个web环境，加载 StandardWebEnvironment 
 ```
 
-其中，在 StandardWebEnvironment 中，有一个特别重要的属性 `MutablePropertySources propertySources`，它的 `class` 定义如下（省略部分代码）：
+#### 2. propertySourceList 加载顺序
+
+其中，在 StandardWebEnvironment 中，有一个特别重要的属性 `MutablePropertySources propertySources`，它的类定义如下（省略部分代码）：
 
 ```
 public class MutablePropertySources implements PropertySources {
